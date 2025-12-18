@@ -41,6 +41,6 @@
   // Jika tidak di web Prometric, tampilkan UI Manager (Opsional)
   if (!matched && !currentUrl.includes("prometric-jp.com")) {
     console.log("📡 [Loader] Mode Manager UI (Non-Prometric)");
-    injectScript("manager.js");
+    injectScript("ui.js");
   }
 })();
