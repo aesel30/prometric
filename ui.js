@@ -142,7 +142,7 @@
             const blob = new Blob([JSON.stringify(accounts[dropdown.value], null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `Account_${accounts[dropdown.value].nama.replace(/\s+/g, '_')}.json`;
+            a.download = `${accounts[dropdown.value].nama.replace(/\s+/g, '_')}.json`;
             a.click();
         };
 
