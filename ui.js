@@ -12,7 +12,7 @@
         localStorage.setItem('af_active_idx', activeIdx);
     };
 
-    // 2. STYLE CSS (Ditambah cursor move)
+    // 2. STYLE CSS
     const style = document.createElement('style');
     style.innerHTML = `
         #af-manager {
@@ -71,7 +71,6 @@
         const dragItem = document.getElementById("af-drag");
         let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
 
-        // Load offset jika ada
         const savedPos = JSON.parse(localStorage.getItem('af_ui_pos_offset') || '{"x":0,"y":0}');
         xOffset = savedPos.x; yOffset = savedPos.y;
         container.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
@@ -100,15 +99,15 @@
             }
         }
 
-        // --- LOGIKA FORM ---
+        // --- LOGIKA FORM & EVENT ---
         const inNama = document.getElementById('in-nama'), inId = document.getElementById('in-id'), inPass = document.getElementById('in-pass'),
               btnSave = document.getElementById('btn-save'), btnUpdate = document.getElementById('btn-update'), 
               dropdown = document.getElementById('acc-dropdown'), statusBox = document.getElementById('af-status');
 
-        dropdown.onchange = () => {
-            activeIdx = dropdown.value !== "" ? dropdown.value : null; save();
-            if (activeIdx !== null) {
-                const acc = accounts[activeIdx];
+        // Fungsi Helper untuk Update Tampilan Form
+        const updateFormState = (idx) => {
+            if (idx !== null && accounts[idx]) {
+                const acc = accounts[idx];
                 inNama.value = acc.nama; inId.value = acc.id; inPass.value = acc.pass;
                 btnSave.style.display = "none"; btnUpdate.style.display = "block";
                 statusBox.innerText = "✅ Akun [" + acc.nama + "] Aktif";
@@ -117,6 +116,12 @@
                 btnSave.style.display = "block"; btnUpdate.style.display = "none";
                 statusBox.innerText = "Status: Standby";
             }
+        };
+
+        dropdown.onchange = () => {
+            activeIdx = dropdown.value !== "" ? dropdown.value : null; 
+            save();
+            updateFormState(activeIdx);
         };
 
         document.getElementById('btn-update').onclick = () => {
@@ -156,6 +161,13 @@
             }
             save(); render();
         };
+
+        // --- INIT: JALANKAN SAAT RENDER PERTAMA KALI ---
+        // Ini bagian penting yang sebelumnya hilang. 
+        // Memastikan form terisi sesuai activeIdx saat halaman dibuka.
+        if (activeIdx !== null && accounts[activeIdx]) {
+            updateFormState(activeIdx);
+        }
     };
 
     render();
