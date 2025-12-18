@@ -1,174 +1,158 @@
 (function() {
-    const currentUrl = window.location.href;
-    const isPrometricReserve = currentUrl.includes("j6.prometric-jp.com/Reserve/");
+    if (document.getElementById('af-container')) return;
 
-    // 1. LOGIKA DATA & POSISI
+    // 1. DATA INITIALIZATION
     let accounts = JSON.parse(localStorage.getItem('af_accounts') || '[]');
     let activeIdx = localStorage.getItem('af_active_idx');
-    let pos = JSON.parse(localStorage.getItem('af_ui_pos') || '{"top":"10px","right":"10px"}');
-
-    const save = () => {
-        localStorage.setItem('af_accounts', JSON.stringify(accounts));
-        localStorage.setItem('af_active_idx', activeIdx);
-    };
+    let isMinimized = true;
 
     // 2. STYLE CSS
     const style = document.createElement('style');
     style.innerHTML = `
-        #af-manager {
-            position: fixed; top: ${pos.top}; right: ${pos.right}; left: ${pos.left || 'auto'};
-            z-index: 10000; background: #fff; border: 2px solid #007bff; padding: 15px;
-            border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            font-family: sans-serif; width: 300px; max-height: 90vh; overflow-y: auto;
-            user-select: none;
+        #af-container { position: fixed; bottom: 20px; right: 20px; z-index: 99999; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        #af-bubble { 
+            width: 55px; height: 55px; background: linear-gradient(135deg, #007bff, #0056b3); 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: 0.3s; color: white; font-size: 24px;
         }
-        .af-header { cursor: move; background: #f8f9fa; margin: -15px -15px 15px -15px; padding: 10px; border-radius: 10px 10px 0 0; border-bottom: 1px solid #eee; }
-        .af-title { font-weight: bold; font-size: 16px; color: #007bff; display: block; text-align: center; }
-        .btn-link-kaigo { width: 100%; background: #6f42c1; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 15px; display: block; text-align: center; text-decoration: none; font-size: 13px; }
-        .af-input { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .af-select { width: 100%; padding: 10px; margin-bottom: 10px; border: 2px solid #28a745; border-radius: 6px; font-weight: bold; cursor: pointer; background: #f0fff0; }
-        .af-btn { border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn-add { width: 100%; background: #007bff; color: white; margin-bottom: 10px; }
-        .btn-edit { width: 100%; background: #ffc107; color: #212529; margin-bottom: 10px; display: none; }
-        .btn-del { width: 100%; background: #dc3545; color: white; font-size: 11px; margin-top: 5px; padding: 5px; }
-        .af-sync-group { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
-        .sync-row { display: flex; gap: 5px; }
-        .btn-export { flex: 1; background: #6c757d; color: white; font-size: 11px; }
-        .btn-import { flex: 1; background: #17a2b8; color: white; font-size: 11px; }
-        #af-status { font-size: 12px; text-align: center; margin-top: 10px; padding: 8px; border-radius: 6px; background: #f8f9fa; font-weight: bold; }
-        input[type="file"] { display: none; }
+        #af-bubble:hover { transform: scale(1.1) rotate(10deg); }
+
+        #af-manager {
+            position: absolute; bottom: 70px; right: 0; width: 300px;
+            background: #ffffff; border-radius: 15px; border: 1px solid #e0e0e0;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25); padding: 18px;
+            display: none; flex-direction: column; gap: 10px;
+            max-height: 80vh; overflow-y: auto;
+        }
+        .show { display: flex !important; animation: slideUp 0.3s ease; }
+        
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .af-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 13px; }
+        .af-select { width: 100%; padding: 12px; border: 2px solid #28a745; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f0fff0; color: #28a745; }
+        .af-btn { border: none; padding: 11px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 13px; width: 100%; }
+        .btn-add { background: #007bff; color: white; }
+        .btn-edit { background: #ffc107; color: #212529; display: none; }
+        .btn-del { background: #f8f9fa; color: #dc3545; border: 1px solid #dc3545; margin-top: 5px; }
+        
+        #af-status { font-size: 12px; text-align: center; color: #666; padding: 5px; border-radius: 5px; background: #f8f9fa; }
     `;
     document.head.appendChild(style);
 
+    // 3. HTML STRUCTURE
     const container = document.createElement('div');
-    container.id = 'af-manager';
-    document.body.appendChild(container);
-
-    const render = () => {
-        container.innerHTML = `
-            <div class="af-header" id="af-drag">
-                <span class="af-title">🚀 Auto Login Pro v7</span>
-            </div>
-            <a href="https://j6.prometric-jp.com/Reserve/Login?CN=JH&LC=ID" target="_blank" class="btn-link-kaigo">🌐 Buka Login Kaigo (ID)</a>
-            <input type="text" id="in-nama" class="af-input" placeholder="Nama Lengkap">
-            <input type="text" id="in-id" class="af-input" placeholder="ID (JP...)">
+    container.id = 'af-container';
+    container.innerHTML = `
+        <div id="af-manager">
+            <div style="font-weight:bold; color:#007bff; text-align:center; font-size: 16px;">🚀 AESEL BOT V8</div>
+            <input type="text" id="in-nama" class="af-input" placeholder="Nama Akun">
+            <input type="text" id="in-id" class="af-input" placeholder="Prometric ID (JP...)">
             <input type="password" id="in-pass" class="af-input" placeholder="Password">
             <button class="af-btn btn-add" id="btn-save">Simpan Akun Baru</button>
-            <button class="af-btn btn-edit" id="btn-update">Update Akun Terpilih</button>
-            <select id="acc-dropdown" class="af-select">
-                <option value="">-- Pilih Akun Aktif --</option>
-                ${accounts.map((acc, i) => `<option value="${i}" ${activeIdx == i ? 'selected' : ''}>${acc.nama}</option>`).join('')}
-            </select>
-            <button class="af-btn btn-del" id="btn-del">Hapus Akun Terpilih</button>
+            <button class="af-btn btn-edit" id="btn-update">Update Akun</button>
+            <select id="acc-dropdown" class="af-select"></select>
+            <button class="af-btn btn-del" id="btn-del">Hapus Akun Ini</button>
             <div id="af-status">Status: Standby</div>
-            <div class="af-sync-group">
-                <div class="sync-row"><button class="af-btn btn-export" id="btn-exp">Export</button><button class="af-btn btn-import" id="btn-imp">Import Banyak</button></div>
-                <input type="file" id="file-input" accept=".json" multiple>
-            </div>
-        `;
+        </div>
+        <div id="af-bubble">🚀</div>
+    `;
+    document.body.appendChild(container);
 
-        // --- LOGIKA DRAG & DROP ---
-        const dragItem = document.getElementById("af-drag");
-        let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
+    const bubble = document.getElementById('af-bubble');
+    const manager = document.getElementById('af-manager');
+    const dropdown = document.getElementById('acc-dropdown');
+    const statusBox = document.getElementById('af-status');
 
-        const savedPos = JSON.parse(localStorage.getItem('af_ui_pos_offset') || '{"x":0,"y":0}');
-        xOffset = savedPos.x; yOffset = savedPos.y;
-        container.style.transform = `translate3d(${xOffset}px, ${yOffset}px, 0)`;
+    // 4. FUNCTIONS
+    const toggleManager = (forceHide = false) => {
+        if (forceHide) isMinimized = true;
+        else isMinimized = !isMinimized;
+        
+        manager.classList.toggle('show', !isMinimized);
+        bubble.innerHTML = isMinimized ? '🚀' : '✖';
+        bubble.style.background = isMinimized ? 'linear-gradient(135deg, #007bff, #0056b3)' : '#6c757d';
+    };
 
-        dragItem.addEventListener("mousedown", dragStart);
-        document.addEventListener("mouseup", dragEnd);
-        document.addEventListener("mousemove", drag);
+    const saveToLocal = () => {
+        localStorage.setItem('af_accounts', JSON.stringify(accounts));
+        localStorage.setItem('af_active_idx', activeIdx);
+    };
 
-        function dragStart(e) {
-            initialX = e.clientX - xOffset;
-            initialY = e.clientY - yOffset;
-            if (e.target === dragItem || dragItem.contains(e.target)) active = true;
-        }
-        function dragEnd() {
-            active = false;
-            localStorage.setItem('af_ui_pos_offset', JSON.stringify({ x: xOffset, y: yOffset }));
-        }
-        function drag(e) {
-            if (active) {
-                e.preventDefault();
-                currentX = e.clientX - initialX;
-                currentY = e.clientY - initialY;
-                xOffset = currentX;
-                yOffset = currentY;
-                container.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
-            }
-        }
+    const renderDropdown = () => {
+        dropdown.innerHTML = '<option value="">-- Pilih Akun Aktif --</option>' + 
+            accounts.map((acc, i) => `<option value="${i}" ${activeIdx == i ? 'selected' : ''}>${acc.nama}</option>`).join('');
+    };
 
-        // --- LOGIKA FORM & EVENT ---
+    const updateFormState = () => {
         const inNama = document.getElementById('in-nama'), inId = document.getElementById('in-id'), inPass = document.getElementById('in-pass'),
-              btnSave = document.getElementById('btn-save'), btnUpdate = document.getElementById('btn-update'), 
-              dropdown = document.getElementById('acc-dropdown'), statusBox = document.getElementById('af-status');
-
-        // Fungsi Helper untuk Update Tampilan Form
-        const updateFormState = (idx) => {
-            if (idx !== null && accounts[idx]) {
-                const acc = accounts[idx];
-                inNama.value = acc.nama; inId.value = acc.id; inPass.value = acc.pass;
-                btnSave.style.display = "none"; btnUpdate.style.display = "block";
-                statusBox.innerText = "✅ Akun [" + acc.nama + "] Aktif";
-            } else {
-                inNama.value = ""; inId.value = ""; inPass.value = "";
-                btnSave.style.display = "block"; btnUpdate.style.display = "none";
-                statusBox.innerText = "Status: Standby";
-            }
-        };
-
-        dropdown.onchange = () => {
-            activeIdx = dropdown.value !== "" ? dropdown.value : null; 
-            save();
-            updateFormState(activeIdx);
-        };
-
-        document.getElementById('btn-update').onclick = () => {
-            if (activeIdx !== null) {
-                accounts[activeIdx] = { nama: inNama.value, id: inId.value, pass: inPass.value };
-                save(); render(); alert("Diperbarui!");
-            }
-        };
-
-        document.getElementById('btn-save').onclick = () => {
-            if (inNama.value && inId.value && inPass.value) {
-                accounts.push({ nama: inNama.value, id: inId.value, pass: inPass.value });
-                save(); render();
-            }
-        };
-
-        document.getElementById('btn-del').onclick = () => {
-            if (dropdown.value !== "") { accounts.splice(dropdown.value, 1); activeIdx = null; save(); render(); }
-        };
-
-        document.getElementById('btn-exp').onclick = () => {
-            if (dropdown.value === "") return alert("Pilih akun!");
-            const blob = new Blob([JSON.stringify(accounts[dropdown.value], null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${accounts[dropdown.value].nama.replace(/\s+/g, '_')}.json`;
-            a.click();
-        };
-
-        document.getElementById('btn-imp').onclick = () => document.getElementById('file-input').click();
-        document.getElementById('file-input').onchange = async (e) => {
-            for (let file of e.target.files) {
-                try {
-                    const data = JSON.parse(await file.text());
-                    accounts = [...accounts, ...(Array.isArray(data) ? data : [data])];
-                } catch (err) {}
-            }
-            save(); render();
-        };
-
-        // --- INIT: JALANKAN SAAT RENDER PERTAMA KALI ---
-        // Ini bagian penting yang sebelumnya hilang. 
-        // Memastikan form terisi sesuai activeIdx saat halaman dibuka.
+              btnSave = document.getElementById('btn-save'), btnUpdate = document.getElementById('btn-update');
+        
         if (activeIdx !== null && accounts[activeIdx]) {
-            updateFormState(activeIdx);
+            const acc = accounts[activeIdx];
+            inNama.value = acc.nama; inId.value = acc.id; inPass.value = acc.pass;
+            btnSave.style.display = 'none'; btnUpdate.style.display = 'block';
+            statusBox.innerText = `✅ Aktif: ${acc.nama}`;
+        } else {
+            inNama.value = ''; inId.value = ''; inPass.value = '';
+            btnSave.style.display = 'block'; btnUpdate.style.display = 'none';
+            statusBox.innerText = 'Status: Standby';
         }
     };
 
-    render();
+    // 5. EVENT LISTENERS
+    bubble.onclick = () => toggleManager();
+
+    dropdown.onchange = (e) => {
+        activeIdx = e.target.value !== "" ? e.target.value : null;
+        saveToLocal();
+        updateFormState();
+        
+        // --- FITUR AUTO-HIDE ---
+        if (activeIdx !== null) {
+            setTimeout(() => {
+                toggleManager(true); // Tutup otomatis setelah memilih
+            }, 600); // Jeda sebentar supaya user melihat status berubah
+        }
+    };
+
+    document.getElementById('btn-save').onclick = () => {
+        const n = document.getElementById('in-nama').value, i = document.getElementById('in-id').value, p = document.getElementById('in-pass').value;
+        if (n && i && p) {
+            accounts.push({ nama: n, id: i, pass: p });
+            activeIdx = accounts.length - 1; // Otomatis aktifkan akun baru
+            saveToLocal();
+            renderDropdown();
+            updateFormState();
+            setTimeout(() => toggleManager(true), 800); // Auto-hide
+        }
+    };
+
+    document.getElementById('btn-update').onclick = () => {
+        if (activeIdx !== null) {
+            accounts[activeIdx] = { 
+                nama: document.getElementById('in-nama').value, 
+                id: document.getElementById('in-id').value, 
+                pass: document.getElementById('in-pass').value 
+            };
+            saveToLocal();
+            renderDropdown();
+            alert("Data Berhasil Diperbarui!");
+            toggleManager(true); // Auto-hide
+        }
+    };
+
+    document.getElementById('btn-del').onclick = () => {
+        if (activeIdx !== null && confirm("Hapus akun ini?")) {
+            accounts.splice(activeIdx, 1);
+            activeIdx = null;
+            saveToLocal();
+            renderDropdown();
+            updateFormState();
+        }
+    };
+
+    // INIT
+    renderDropdown();
+    updateFormState();
 })();
