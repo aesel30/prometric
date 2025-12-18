@@ -1,46 +1,80 @@
-(function () {
-  const GITHUB_BASE = "https://raw.githubusercontent.com/aesel30/prometric/refs/heads/main/";
-  const currentUrl = window.location.href;
+// ==UserScript==
+// @name         Aesel Bot
+// @namespace    https://aesel.web.id/
+// @version      1.0.0
+// @description  membantu proses reservasi
+// @author       Aesel Reservasi
+// @match        https://*/*
+// @match        *://*.prometric-jp.com/*
+// @match        about:blank
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
+// @run-at       document-end
+// ==/UserScript==
 
-  // Definisikan rute dan file yang harus dipanggil
-  const routes = [
-    { pattern: "/Reserve/Login", scripts: ["login.js"] },
-    { pattern: "/Reserve/TestList", scripts: ["reserve.js", "check.js"] },
-    { pattern: "/Reserve/SelectPlace", scripts: ["autoTarget.js", "chkDate.js"] },
-    { pattern: "/Reserve/Confirm", scripts: ["confirm.js"] },
-    { pattern: "/Error", scripts: ["error.js"] },
-  ];
+(function() {
+    'use strict';
 
-  // Fungsi untuk menyuntikkan script ke halaman
-  const injectScript = (fileName) => {
-    fetch(`${GITHUB_BASE}${fileName}?v=${Math.random()}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Gagal mengambil ${fileName}`);
-        return res.text();
-      })
-      .then((code) => {
-        const s = document.createElement("script");
-        s.textContent = code;
-        document.body.appendChild(s);
-        console.log(`✅ [Loaded] ${fileName}`);
-      })
-      .catch((err) => console.error(`❌ [Error] ${fileName}:`, err));
-  };
+    const GITHUB_BASE = "https://raw.githubusercontent.com/aesel30/prometric/main/";
+    const currentUrl = window.location.href;
 
-  // Cek kecocokan URL
-  let matched = false;
-  for (const route of routes) {
-    if (currentUrl.includes(route.pattern)) {
-      console.log(`📡 [Loader] Mendeteksi rute ${route.pattern}, memuat script...`);
-      route.scripts.forEach((script) => injectScript(script));
-      matched = true;
-      break;
+    // Rute script fungsional
+    const routes = [
+        { pattern: "/Reserve/Login", scripts: ["login.js"] },
+        { pattern: "/Reserve/TestList", scripts: ["reserve.js", "check.js"] },
+        { pattern: "/Reserve/SelectPlace", scripts: ["autoTarget.js", "chkDate.js"] },
+        { pattern: "/Reserve/Confirm", scripts: ["confirm.js"] },
+        { pattern: "/Error", scripts: ["error.js"] }
+    ];
+
+    // Fungsi Injector Utama (Menggunakan GM_xmlhttpRequest agar tidak diblokir CSP)
+    const inject = (fileName) => {
+        return new Promise((resolve) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: `${GITHUB_BASE}${fileName}?v=${Math.random()}`,
+                onload: function(res) {
+                    if (res.status === 200) {
+                        try {
+                            // Menjalankan kode langsung di memori browser
+                            const run = new Function(res.responseText);
+                            run();
+                            console.log(`✅ [Loaded] ${fileName}`);
+                        } catch (e) {
+                            console.error(`❌ [Eval Error] ${fileName}:`, e);
+                        }
+                    } else {
+                        console.error(`❌ [HTTP Error] ${fileName}: ${res.status}`);
+                    }
+                    resolve();
+                },
+                onerror: (err) => {
+                    console.error(`❌ [Network Error] ${fileName}`, err);
+                    resolve();
+                }
+            });
+        });
+    };
+
+    async function startLoader() {
+        console.log("📡 [Loader] Menyiapkan Sistem...");
+
+        // A. SELALU MUAT UI (Floating Bubble) di semua halaman
+        await inject("ui.js");
+
+        // B. MUAT SCRIPT SPESIFIK HALAMAN (Jika di Prometric)
+        if (currentUrl.includes("prometric-jp.com/Reserve/")) {
+            for (const route of routes) {
+                if (currentUrl.includes(route.pattern)) {
+                    console.log(`🎯 Rute Cocok: ${route.pattern}`);
+                    for (const script of route.scripts) {
+                        await inject(script);
+                    }
+                    break;
+                }
+            }
+        }
     }
-  }
 
-  // Jika tidak di web Prometric, tampilkan UI Manager (Opsional)
-  if (!matched && !currentUrl.includes("prometric-jp.com")) {
-    console.log("📡 [Loader] Mode Manager UI (Non-Prometric)");
-    injectScript("ui.js");
-  }
+    startLoader();
 })();
